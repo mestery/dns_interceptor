@@ -64,6 +64,20 @@ pub mod dns_interceptor {
         }
     }
 
+    // Function to print final statistics
+    fn print_final_stats(stats: &Stats) {
+        println!("\n--- Final DNS Statistics ---");
+        println!("Total requests: {}", stats.total_requests);
+
+        // Print top domains
+        let mut domains: Vec<_> = stats.requests_by_domain.iter().collect();
+        domains.sort_by(|a, b| b.1.cmp(a.1));
+        println!("Top domains:");
+        for (domain, count) in domains.iter().take(5) {
+            println!("  {}: {} requests", domain, count);
+        }
+    }
+
     pub fn main() {
         let args = Args::parse();
 
@@ -148,6 +162,9 @@ pub mod dns_interceptor {
             eprintln!("Error joining stats thread: {:?}", e);
         }
 
+        // Print final statistics
+        let stats = stats.lock().unwrap();
+        print_final_stats(&stats);
         println!("DNS Interceptor stopped.");
     }
 
