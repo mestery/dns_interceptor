@@ -10,3 +10,4 @@ edition = "2021"
 pcap = "1.0"
 ctrlc = "3.0"
 dns-parser = "0.8"
+clap = { version = "4.0", features = ["derive"] }

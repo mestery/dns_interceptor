@@ -1,4 +1,5 @@
 // This is the main application module
+
 pub mod dns_interceptor {
     use pcap::{Capture};
     use dns_parser::{Packet as DnsPacket};
@@ -41,8 +42,35 @@ pub mod dns_interceptor {
         }
     }
 
+    // Simple command line argument parsing
+    #[derive(Debug)]
+    pub struct Args {
+        pub debug: bool,
+    }
+
+    impl Args {
+        pub fn parse() -> Self {
+            let mut debug = false;
+
+            // Check for command line arguments
+            let args: Vec<String> = std::env::args().collect();
+            for arg in &args {
+                if arg == "--debug" || arg == "-d" {
+                    debug = true;
+                }
+            }
+
+            Args { debug }
+        }
+    }
+
     pub fn main() {
+        let args = Args::parse();
+
         println!("DNS Interceptor - Starting...");
+        if args.debug {
+            println!("Debug mode enabled - non-DNS packet messages will be hidden");
+        }
         
         // Create a capture object for the default interface
         let mut cap = Capture::from_device("en0")
@@ -50,25 +78,32 @@ pub mod dns_interceptor {
             .immediate_mode(true)
             .open()
             .expect("Failed to open capture");
-        
+
         // Create an atomic boolean for graceful shutdown
         let running = Arc::new(AtomicBool::new(true));
         let r = running.clone();
-        
+
         // Handle Ctrl+C gracefully
         ctrlc::set_handler(move || {
             println!("Shutting down...");
             r.store(false, Ordering::SeqCst);
         }).expect("Error setting Ctrl-C handler");
-        
+
         // Statistics tracking
         let stats = Arc::new(Mutex::new(Stats::new()));
         let stats_for_thread = Arc::clone(&stats);
-        
+
         // Print statistics every 5 seconds
+        let running_for_stats = running.clone();
         let stats_thread = thread::spawn(move || {
             loop {
                 thread::sleep(Duration::from_secs(5));
+
+                // Check if we should still run
+                if !running_for_stats.load(Ordering::SeqCst) {
+                    break;
+                }
+
                 let stats = stats_for_thread.lock().unwrap(); // Lock to read stat
                 println!("\n--- DNS Statistics ---");
                 println!("Total requests: {}", stats.total_requests);
@@ -96,7 +131,9 @@ pub mod dns_interceptor {
                         stats.increment_total();
                         stats.add_request_by_domain(dns_request.query_name);
                     } else {
-                        println!("Non-DNS packet received: {} bytes", packet.data.len());
+                        if args.debug {
+                            println!("Non-DNS packet received: {} bytes", packet.data.len());
+                        }
                     }
                 }
                 Err(e) => {
@@ -105,9 +142,13 @@ pub mod dns_interceptor {
                 }
             }
         }
-        
+
         // Wait for stats thread to finish
-        stats_thread.join().unwrap();
+        if let Err(e) = stats_thread.join() {
+            eprintln!("Error joining stats thread: {:?}", e);
+        }
+
+        println!("DNS Interceptor stopped.");
     }
 
     fn parse_dns_packet(packet: &[u8]) -> Option<DnsRequest> {
