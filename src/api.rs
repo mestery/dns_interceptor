@@ -1,3 +1,6 @@
+//
+// Copy right 2025 Kyle Mestery
+//
 use std::sync::{Arc, Mutex};
 use warp::Filter;
 
