@@ -8,6 +8,7 @@ A simple DNS packet interceptor written in Rust that captures and analyzes DNS q
 - Displays DNS query information in real-time
 - Tracks statistics about DNS requests
 - Graceful shutdown with Ctrl+C
+- REST API for accessing DNS statistics
 
 ## Usage
 
@@ -17,9 +18,29 @@ To run the DNS interceptor:
  cargo run
 ```
 
+To run with a custom API port:
+
+```bash
+ cargo run -- --api-port 9090
+```
+
 > Note: You may need to run with `sudo` privileges on some systems to capture network packets.
 
 The program will capture DNS packets on the default network interface and display them in the console.
+
+## API Endpoints
+
+Once running, you can access statistics via these endpoints:
+
+- `GET /stats` - Get all DNS statistics
+- `GET /stats/total` - Get total request count
+- `GET /stats/domains` - Get domain request counts
+
+Example usage with curl:
+
+```bash
+curl http://localhost:9090/stats
+```
 
 ## How It Works
 

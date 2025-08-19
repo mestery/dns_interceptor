@@ -1,5 +1,7 @@
 // This is the main application module
 
+mod api;
+
 pub mod dns_interceptor {
     use pcap::{Capture};
     use dns_parser::{Packet as DnsPacket};
@@ -40,27 +42,41 @@ pub mod dns_interceptor {
         pub fn add_request_by_domain(&mut self, domain: String) {
             *self.requests_by_domain.entry(domain).or_insert(0) += 1;
         }
+
+        // Methods to get stats for API
+        pub fn get_total_requests(&self) -> usize {
+            self.total_requests
+        }
+
+        pub fn get_requests_by_domain(&self) -> &HashMap<String, usize> {
+            &self.requests_by_domain
+        }
     }
 
     // Simple command line argument parsing
     #[derive(Debug)]
     pub struct Args {
         pub debug: bool,
+        pub api_port: u16,
     }
 
     impl Args {
         pub fn parse() -> Self {
             let mut debug = false;
+            let mut api_port = 9090; // Default API port
 
             // Check for command line arguments
             let args: Vec<String> = std::env::args().collect();
-            for arg in &args {
-                if arg == "--debug" || arg == "-d" {
+            for i in 0..args.len() {
+                if args[i] == "--debug" || args[i] == "-d" {
                     debug = true;
+                }
+                if args[i] == "--api-port" && i + 1 < args.len() {
+                    api_port = args[i + 1].parse().unwrap_or(9090);
                 }
             }
 
-            Args { debug }
+            Args { debug, api_port }
         }
     }
 
@@ -77,6 +93,25 @@ pub mod dns_interceptor {
             println!("  {}: {} requests", domain, count);
         }
     }
+
+    // Function to start the API server
+    pub fn start_api_server(stats: Arc<Mutex<Stats>>, port: u16) {
+        // Import the API filter from api.rs
+        let api_filter = crate::api::api_filter(stats);
+
+        // Start the server in a separate thread
+        println!("Starting API server on port {}", port);
+        std::thread::spawn(move || {
+            // Use tokio runtime to run the warp server
+            tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                warp::serve(api_filter)
+                    .run(([127, 0, 0, 1], port))
+                    .await;
+            });
+        });
+    }
+
+
 
     pub fn main() {
         let args = Args::parse();
@@ -132,6 +167,13 @@ pub mod dns_interceptor {
             }
         });
         
+        // Start API server in a separate thread
+        let api_stats = Arc::clone(&stats);
+        let api_port = args.api_port;
+        let _api_thread = thread::spawn(move || {
+            start_api_server(api_stats, api_port);
+        });
+
         // Main packet processing loop
         while running.load(Ordering::SeqCst) {
             match cap.next_packet() {
