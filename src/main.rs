@@ -1,4 +1,7 @@
 // This is the main application module
+//
+// Copyright (c) 2025, Kyle Mestery
+//
 
 mod api;
 
