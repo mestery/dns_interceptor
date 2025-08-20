@@ -1,4 +1,5 @@
 # DNS Interceptor
+[![Build Status](https://github.com/mestery/dns_interceptor/actions/workflows/build.yml/badge.svg)](https://github.com/mestery/dns_interceptor/actions/workflows/build.yml)
 
 A simple DNS packet interceptor written in Rust that captures and analyzes DNS queries on your network.
 
